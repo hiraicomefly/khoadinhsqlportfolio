@@ -1,0 +1,85 @@
+WITH cte AS (
+  SELECT transactions.id,
+  transactions.product_id
+  FROM okxe-data.`source_okxe_prod.transactions` transactions
+  left join
+    `okxe-data.source_okxe_prod.purchase_orders` po ON po.id = transactions.purchase_order_id
+  left join 
+    okxe-data.`source_okxe_prod.products` product on transactions.product_id = product.id 
+  WHERE 
+  po.purchase_order_code is not null
+  and transactions.status in (5,11)
+  and (DATE(TIMESTAMP(transactions.seller_confirmed_at, 'UTC+0')) >= "2021-02-01" -- start Econtract luồng mới
+  or DATE(TIMESTAMP(transactions.buyer_confirmed_at, 'UTC+0')) >= "2021-02-01")
+
+),
+
+cte2 AS (
+  SELECT id 
+  FROM okxe-data.`source_okxe_prod.products` product 
+  left join okxe-data.`source_okxe_external.itemquality_masterdata_stores` masterstores 
+    on cast(product.store_id as string) = masterstores.id_dealer -- stores ggsheet
+  WHERE is_qualified = 1 
+  and (cast(store_id as string) = masterstores.id_dealer) 
+  and (masterstores.tinh_trang_cua_hang = 'FALSE')
+  and date(product.created_at) >= '2022-11-28'
+  and sales_status = 'blocked' and blocked_reason = 'Xe đã bán'
+)
+
+
+SELECT 
+  DISTINCT product.id as product_id, --1 item product id
+  --UPPER(pu.salesman) as salesman_name,--2 item salesman input name
+  --location.name as location_name, --3 item location
+  --CASE
+  --  WHEN location.id IN (2,14,22,7) THEN 'South'
+  --  ELSE 'North' END AS Region, -- 4 item regions
+  --UPPER(brands.name) AS brand_name,-- 5 item brands
+  --UPPER(masterstores.store_name) AS store_name, --6 store name
+  --DATE(product.created_at) AS created_date,--7 item created date
+  --
+  --transactions.id as transaction_id, -- 8 transactions
+  case 
+  when product.id in ((select product_id from cte)) then 'e-contract'
+  when product.id in (select id from cte2) then 'offline'
+  else 'Undefined'
+  end as transaction_type,
+  count(*) as count  
+ 
+
+
+
+  #transactions.status as transactions_status -- 9 transactions status
+  #PARSE_DATE('%Y%m%d', @DS_START_DATE) as start_date,
+  #PARSE_DATE('%Y%m%d', @DS_END_DATE) as end_date
+
+FROM 
+  okxe-data.`source_okxe_prod.products` product --product
+  left join 
+    okxe-data.`source_okxe_prod.locations` location 
+    on product.location_id = location.id --location
+  left join 
+    okxe-data.`source_okxe_external.itemquality_masterdata_stores` masterstores 
+    on cast(product.store_id as string) = masterstores.id_dealer -- stores ggsheet
+  left join 
+    okxe-data.`source_okxe_prod.transactions` transactions 
+    on transactions.product_id = product.id --transactions
+  left join 
+    okxe-data.`source_okxe_external.itemquality_masterdata_products_usedbikes` pu 
+    on pu.product_id = cast(product.id as string) --table use for salesman name tracking kpi
+  left join 
+    okxe-data.`source_okxe_prod.brands` brands 
+    on product.brand_id = brands.id --brands 
+ 
+
+WHERE 
+  product.is_qualified = 1 
+  and (cast(product.store_id as string) = masterstores.id_dealer) 
+  and (masterstores.tinh_trang_cua_hang = 'FALSE')
+  and date(product.created_at) >= '2022-11-28'
+  #and transactions.status in (5,10,11)
+  #and masterstores.id_dealer = '235179'
+  and product.deleted_at is not null
+  
+
+GROUP BY 1--,2,3,4,5,6,7,8

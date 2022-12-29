@@ -1,0 +1,45 @@
+select
+      product.id as product_id,
+      masterstores.salesman as salesman_name,
+      case
+        when user_id = 1543140 then 'South Sales'
+        when user_id = 1543141 then 'North Sales'
+        end 
+        as created_by, 
+      UPPER(masterstores.store_name) AS store_name,
+      REPLACE(REPLACE(insurance.license_plate, '-', ''), '.', '') as license_plate,
+      product.price AS bike_price,
+
+      case
+        when product.is_qualified = 1 then 'Quality Program'
+        else 'Not Quality Program' 
+        end as Item_status,
+      date(insurance.created_at) as created_at,
+      CASE
+        WHEN location.id IN (2,14,22,7) THEN 'South'
+        ELSE 'North' END AS Region, -- 4 item regions
+
+#PARSE_DATE('%Y%m%d', @DS_START_DATE) as start_date,
+#PARSE_DATE('%Y%m%d', @DS_END_DATE) as end_date
+
+
+from okxe-data.source_okxe_prod.insurance_orders insurance
+  left join okxe-data.`source_okxe_prod.products` product
+    on REPLACE(REPLACE(insurance.license_plate, '-', ''), '.', '') = REPLACE(REPLACE(product.license_plate, '-', ''), '.', '')
+  left join okxe-data.`source_okxe_external.itemquality_masterdata_stores` masterstores 
+    on cast(product.store_id as string) = masterstores.id_dealer -- stores ggsheet
+  left join 
+    okxe-data.`source_okxe_prod.locations` location 
+    on product.location_id = location.id --location 
+
+
+where 
+product.is_qualified = 1
+and insurance.user_id in (1543140,1543141)
+and insurance.status = 4 
+and date(product.created_at) >= '2022-11-28'
+
+
+
+
+        

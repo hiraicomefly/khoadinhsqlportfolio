@@ -1,0 +1,80 @@
+SELECT 
+  distinct product.id as product_id, --1 item product id
+  UPPER(masterstores.salesman) as salesman_name,--2 item salesman input name
+  location.name as location_name, --3 item location
+  CASE
+    WHEN location.id IN (2,14,22,7) THEN 'South'
+    ELSE 'North' END AS Region, -- 4 item regions
+  UPPER(brands.name) AS brand_name,-- 5 item brands
+  UPPER(REPLACE(product.bike_slug, '-',' ')) AS model, -- 6 item full name 
+  UPPER(masterstores.store_name) AS store_name, --7 store name
+  COUNT(views.action) AS item_view, --8 item views
+  LEFT(CAST(product.release_year AS STRING),4) AS release_year, --9 item release year
+  product.price AS bike_price, --10 item prices
+  product.used_distance AS used_distance, --11 item distance used
+  DATE(product.created_at) AS created_date,--12 item created date
+  CASE 
+    WHEN product.sales_status = 'ing' THEN 'APPROVED' 
+    WHEN product.sales_status = 'in review' THEN 'IN REVIEW'
+    WHEN (product.sales_status = 'blocked' and blocked_reason != 'Xe đã bán') THEN 'NOT APPROVED'
+    WHEN (product.sales_status = 'blocked' and blocked_reason = 'Xe đã bán') THEN 'SOLD OFFLINE'
+    WHEN product.sales_status = 'done' THEN 'SOLD ONLINE'
+    ELSE 'unidentified'
+  END
+  AS item_status, -- 13 item status on okxe admin
+  sms.count_sms AS item_sms, --14 item sms
+  chat.count_chat AS item_chat, -- 15 item chat
+  calls.count_call AS item_call, --16 item calls
+  transactions.id as transactions_id,-- 17 transactions
+  transactions.status as transactions_status, -- 18 transactions status
+  product.deleted_at as deleted_status -- 19 - New columns for tracking deleted items
+
+#PARSE_DATE('%Y%m%d', @DS_START_DATE) as start_date,
+#PARSE_DATE('%Y%m%d', @DS_END_DATE) as end_date
+
+FROM 
+  okxe-data.`source_okxe_prod.products` product --product
+  left join 
+    okxe-data.`source_okxe_prod.locations` location 
+    on product.location_id = location.id --location 
+  left join 
+    okxe-data.`source_okxe_external.itemquality_masterdata_stores` masterstores 
+    on cast(product.store_id as string) = masterstores.id_dealer -- stores ggsheet
+  left join 
+    okxe-data.`source_okxe_prod.model_details` models 
+    on product.model_id = models.id --model detail 
+  left join 
+    okxe-data.`source_okxe_prod.brands` brands 
+    on product.brand_id = brands.id --brands 
+  left join 
+    okxe-data.`source_okxe_external.dynamodb_view_items` views 
+    on product.id = views.product_id --item view
+  left join 
+    (select product_id, count(*) as count_sms 
+    from okxe-data.`source_okxe_external.dynamodb_product_click_sms` group by 1) sms 
+    on sms.product_id = product.id --item sms 
+  left join 
+    (select product_id, count(*) as count_chat 
+    from okxe-data.`source_okxe_external.dynamodb_product_click_chats` group by 1) chat 
+    on chat.product_id = product.id --item chat
+  left join
+    (select product_id, count(*) as count_call 
+    from okxe-data.`source_okxe_external.dynamodb_product_click_calls` group by 1) calls 
+    on calls.product_id = product.id --item   calls 
+  --left join 
+  --  okxe-data.`source_okxe_external.itemquality_masterdata_products_usedbikes` pu 
+  --  on pu.product_id = cast(product.id as string) --table use for salesman name tracking kpi
+  left join 
+    okxe-data.`source_okxe_prod.transactions` transactions 
+    on transactions.product_id = product.id --transactions
+
+
+WHERE 
+  product.is_qualified = 1 
+  and (cast(product.store_id as string) = masterstores.id_dealer) 
+  and (masterstores.tinh_trang_cua_hang = 'FALSE')
+  and date(product.created_at) >= '2022-11-28'
+  and product.deleted_at is null
+#and transactions.status in (5,10,11) 
+
+GROUP BY 1,2,3,4,5,6,7,9,10,11,12,13,14,15,16,17,18,19

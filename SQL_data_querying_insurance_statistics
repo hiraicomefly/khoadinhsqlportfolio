@@ -23,13 +23,13 @@ select
 #PARSE_DATE('%Y%m%d', @DS_END_DATE) as end_date
 
 
-from okxe-data.source_okxe_prod.insurance_orders insurance
-  left join okxe-data.`source_okxe_prod.products` product
+from master-data.source_okxe_prod.insurance_orders insurance
+  left join master-data.`source_okxe_prod.products` product
     on REPLACE(REPLACE(insurance.license_plate, '-', ''), '.', '') = REPLACE(REPLACE(product.license_plate, '-', ''), '.', '')
-  left join okxe-data.`source_okxe_external.itemquality_masterdata_stores` masterstores 
+  left join master-data.`source_okxe_external.itemquality_masterdata_stores` masterstores 
     on cast(product.store_id as string) = masterstores.id_dealer -- stores ggsheet
   left join 
-    okxe-data.`source_okxe_prod.locations` location 
+    master-data.`source_okxe_prod.locations` location 
     on product.location_id = location.id --location 
 
 

@@ -1,11 +1,11 @@
 WITH cte AS (
   SELECT transactions.id,
   transactions.product_id
-  FROM okxe-data.`source_okxe_prod.transactions` transactions
+  FROM master-data.`source_master_prod.transactions` transactions
   left join
-    `okxe-data.source_okxe_prod.purchase_orders` po ON po.id = transactions.purchase_order_id
+    `master-data.source_master_prod.purchase_orders` po ON po.id = transactions.purchase_order_id
   left join 
-    okxe-data.`source_okxe_prod.products` product on transactions.product_id = product.id 
+    master-data.`source_master_prod.products` product on transactions.product_id = product.id 
   WHERE 
   po.purchase_order_code is not null
   and transactions.status in (5,11)
@@ -16,8 +16,8 @@ WITH cte AS (
 
 cte2 AS (
   SELECT id 
-  FROM okxe-data.`source_okxe_prod.products` product 
-  left join okxe-data.`source_okxe_external.itemquality_masterdata_stores` masterstores 
+  FROM master-data.`source_okxe_prod.products` product 
+  left join master-data.`source_master_external.itemquality_masterdata_stores` masterstores 
     on cast(product.store_id as string) = masterstores.id_dealer -- stores ggsheet
   WHERE is_qualified = 1 
   and (cast(store_id as string) = masterstores.id_dealer) 
@@ -54,21 +54,21 @@ SELECT
   #PARSE_DATE('%Y%m%d', @DS_END_DATE) as end_date
 
 FROM 
-  okxe-data.`source_okxe_prod.products` product --product
+  master-data.`source_master_prod.products` product --product
   left join 
-    okxe-data.`source_okxe_prod.locations` location 
+    master-data.`source_master_prod.locations` location 
     on product.location_id = location.id --location
   left join 
-    okxe-data.`source_okxe_external.itemquality_masterdata_stores` masterstores 
+    master-data.`source_master_external.itemquality_masterdata_stores` masterstores 
     on cast(product.store_id as string) = masterstores.id_dealer -- stores ggsheet
   left join 
-    okxe-data.`source_okxe_prod.transactions` transactions 
+    master-data.`source_master_prod.transactions` transactions 
     on transactions.product_id = product.id --transactions
   left join 
-    okxe-data.`source_okxe_external.itemquality_masterdata_products_usedbikes` pu 
+    master-data.`source_master_external.itemquality_masterdata_products_usedbikes` pu 
     on pu.product_id = cast(product.id as string) --table use for salesman name tracking kpi
   left join 
-    okxe-data.`source_okxe_prod.brands` brands 
+    master-data.`source_master_prod.brands` brands 
     on product.brand_id = brands.id --brands 
  
 
